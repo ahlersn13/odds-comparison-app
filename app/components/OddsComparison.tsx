@@ -52,13 +52,18 @@ export default function OddsComparison({ sport, sportTitle }: OddsComparisonProp
   ];
 
   useEffect(() => {
-    fetch(`/api/odds?sport=${sport}`)
-      .then(res => res.json())
-      .then(data => {
-        setGames(data);
-        setLoading(false);
-      });
-  }, [sport]);
+      fetch(`/api/odds?sport=${sport}`)
+        .then(res => res.json())
+        .then(data => {
+          setGames(Array.isArray(data) ? data : []);
+          setLoading(false);
+        })
+        .catch(err => {
+          console.error('Error fetching odds:', err);
+          setGames([]);
+          setLoading(false);
+        });
+    }, [sport]);
 
   // Convert decimal odds to American odds
   const decimalToAmerican = (decimal: number): number => {
