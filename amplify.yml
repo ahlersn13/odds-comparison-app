@@ -6,6 +6,7 @@ frontend:
         - npm ci
     build:
       commands:
+        - env | grep -E 'DATABASE_URL|POSTGRES_URL|ODDS_API_KEY|CRON_SECRET' >> .env.production
         - npm run build
   artifacts:
     baseDirectory: .next
@@ -14,9 +15,3 @@ frontend:
   cache:
     paths:
       - node_modules/**/*
-environment:
-  variables:
-    DATABASE_URL: ${DATABASE_URL}
-    POSTGRES_URL: ${POSTGRES_URL}
-    ODDS_API_KEY: ${ODDS_API_KEY}
-    CRON_SECRET: ${CRON_SECRET}
