@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import sql from '../../lib/db';
+import { query } from '../../lib/db';
 
 const CACHE_DURATION_HOURS = 2;
 
@@ -8,11 +8,10 @@ export async function GET(request: Request) {
   const sport = searchParams.get('sport') || 'basketball_nba';
 
   try {
-    // Check when we last fetched this sport
-    const lastFetch = await sql`
-      SELECT fetched_at FROM last_fetch 
-      WHERE sport_key = ${sport}
-    `;
+    const lastFetch = await query(
+      'SELECT fetched_at FROM last_fetch WHERE sport_key = $1',
+      [sport]
+    );
 
     const now = new Date();
     const cacheExpiry = new Date(now.getTime() - CACHE_DURATION_HOURS * 60 * 60 * 1000);
@@ -21,19 +20,16 @@ export async function GET(request: Request) {
       new Date(lastFetch[0].fetched_at) < cacheExpiry;
 
     if (!needsFresh) {
-      // Return cached data from database
       console.log(`Returning cached data for ${sport}`);
-      const cachedGames = await sql`
-        SELECT data FROM odds_cache 
-        WHERE sport_key = ${sport}
-        ORDER BY fetched_at DESC
-      `;
+      const cachedGames = await query(
+        'SELECT data FROM odds_cache WHERE sport_key = $1 ORDER BY fetched_at DESC',
+        [sport]
+      );
       
       const games = cachedGames.map(row => row.data);
       return NextResponse.json(games);
     }
 
-    // Fetch fresh data from The Odds API
     console.log(`Fetching fresh data for ${sport}`);
     const apiKey = process.env.ODDS_API_KEY;
     const regions = 'us';
@@ -45,23 +41,23 @@ export async function GET(request: Request) {
     const games = await response.json();
 
     if (Array.isArray(games) && games.length > 0) {
-      // Save each game to database
       for (const game of games) {
-        await sql`
-          INSERT INTO odds_cache (sport_key, game_id, data, fetched_at)
-          VALUES (${sport}, ${game.id}, ${JSON.stringify(game)}, NOW())
-          ON CONFLICT (sport_key, game_id) 
-          DO UPDATE SET data = ${JSON.stringify(game)}, fetched_at = NOW()
-        `;
+        await query(
+          `INSERT INTO odds_cache (sport_key, game_id, data, fetched_at)
+           VALUES ($1, $2, $3, NOW())
+           ON CONFLICT (sport_key, game_id)
+           DO UPDATE SET data = $3, fetched_at = NOW()`,
+          [sport, game.id, JSON.stringify(game)]
+        );
       }
 
-      // Update last fetch time
-      await sql`
-        INSERT INTO last_fetch (sport_key, fetched_at)
-        VALUES (${sport}, NOW())
-        ON CONFLICT (sport_key)
-        DO UPDATE SET fetched_at = NOW()
-      `;
+      await query(
+        `INSERT INTO last_fetch (sport_key, fetched_at)
+         VALUES ($1, NOW())
+         ON CONFLICT (sport_key)
+         DO UPDATE SET fetched_at = NOW()`,
+        [sport]
+      );
     }
 
     return NextResponse.json(games);

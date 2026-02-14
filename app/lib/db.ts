@@ -1,12 +1,26 @@
-import { neon } from '@neondatabase/serverless';
+import { Pool } from 'pg';
 
-const sql = neon(process.env.DATABASE_URL!);
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false
+  }
+});
 
-export default sql;
+export default pool;
 
-// Create tables if they don't exist
+export async function query(text: string, params?: any[]) {
+  const client = await pool.connect();
+  try {
+    const result = await client.query(text, params);
+    return result.rows;
+  } finally {
+    client.release();
+  }
+}
+
 export async function initializeDatabase() {
-  await sql`
+  await query(`
     CREATE TABLE IF NOT EXISTS odds_cache (
       id SERIAL PRIMARY KEY,
       sport_key VARCHAR(100) NOT NULL,
@@ -15,13 +29,13 @@ export async function initializeDatabase() {
       fetched_at TIMESTAMP DEFAULT NOW(),
       UNIQUE(sport_key, game_id)
     )
-  `;
+  `);
 
-  await sql`
+  await query(`
     CREATE TABLE IF NOT EXISTS last_fetch (
       id SERIAL PRIMARY KEY,
       sport_key VARCHAR(100) UNIQUE NOT NULL,
       fetched_at TIMESTAMP DEFAULT NOW()
     )
-  `;
+  `);
 }
