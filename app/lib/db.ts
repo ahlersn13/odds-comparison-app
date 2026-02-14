@@ -5,9 +5,14 @@ let pool: Pool | null = null;
 function getPool() {
   if (!pool) {
     const connectionString = process.env.DATABASE_URL;
-    console.log('DATABASE_URL exists:', !!connectionString);
-    console.log('Connection string start:', connectionString?.substring(0, 20));
     
+    console.log('DATABASE_URL exists:', !!connectionString);
+    console.log('NODE_ENV:', process.env.NODE_ENV);
+    
+    if (!connectionString) {
+      throw new Error('DATABASE_URL environment variable is not set');
+    }
+
     pool = new Pool({
       connectionString,
       ssl: {

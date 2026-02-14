@@ -1,0 +1,22 @@
+version: 1
+frontend:
+  phases:
+    preBuild:
+      commands:
+        - npm ci
+    build:
+      commands:
+        - npm run build
+  artifacts:
+    baseDirectory: .next
+    files:
+      - '**/*'
+  cache:
+    paths:
+      - node_modules/**/*
+environment:
+  variables:
+    DATABASE_URL: ${DATABASE_URL}
+    POSTGRES_URL: ${POSTGRES_URL}
+    ODDS_API_KEY: ${ODDS_API_KEY}
+    CRON_SECRET: ${CRON_SECRET}
