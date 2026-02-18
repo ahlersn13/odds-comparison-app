@@ -26,7 +26,10 @@ export async function GET(request: Request) {
         [sport]
       );
       
-      const games = cachedGames.map(row => row.data);
+      const games = cachedGames
+        .map(row => typeof row.data === 'string' ? JSON.parse(row.data) : row.data)
+        .filter(game => new Date(game.commence_time) > new Date());
+      
       return NextResponse.json(games);
     }
 
@@ -60,7 +63,12 @@ export async function GET(request: Request) {
       );
     }
 
-    return NextResponse.json(games);
+    // Filter out completed games before returning
+    const upcomingGames = Array.isArray(games) 
+      ? games.filter(game => new Date(game.commence_time) > new Date())
+      : games;
+
+    return NextResponse.json(upcomingGames);
 
   } catch (error) {
     console.error('Error fetching odds:', error);
