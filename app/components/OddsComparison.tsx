@@ -36,6 +36,7 @@ export default function OddsComparison({ sport, sportTitle }: OddsComparisonProp
   const [games, setGames] = useState<Game[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedBook, setSelectedBook] = useState('fanduel');
+  const [searchTerm, setSearchTerm] = useState('');
 
   const sportsbooks = [
     { key: 'fanduel', title: 'FanDuel' },
@@ -197,6 +198,25 @@ export default function OddsComparison({ sport, sportTitle }: OddsComparisonProp
         </select>
       </div>
 
+      <div className="mb-6">
+        <label className="block text-sm font-medium mb-2">Search Teams:</label>
+        <input
+          type="text"
+          placeholder="Search by team name..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="border rounded px-4 py-2 w-64"
+        />
+        {searchTerm && (
+          <button
+            onClick={() => setSearchTerm('')}
+            className="ml-2 text-sm text-blue-600 hover:text-blue-800"
+          >
+            Clear
+          </button>
+        )}
+      </div>
+
       {/* TOP 10 VALUE PLAYS */}
       {topValuePlays.length > 0 && (
         <div className="mb-8 bg-gradient-to-r from-green-50 to-blue-50 rounded-lg p-6 border-2 border-green-200">
@@ -260,6 +280,7 @@ export default function OddsComparison({ sport, sportTitle }: OddsComparisonProp
 {/* All Games List */}
 <h2 className="text-2xl font-bold mb-4">All Games</h2>
 
+
 {/* CHECK IF SELECTED BOOK HAS ANY GAMES */}
 {games.length > 0 && !games.some(game => game.bookmakers.find(b => b.key === selectedBook)) ? (
   <div className="bg-yellow-50 border-2 border-yellow-200 rounded-lg p-6 text-center">
@@ -296,128 +317,138 @@ export default function OddsComparison({ sport, sportTitle }: OddsComparisonProp
   </div>
 ) : (
   <div className="space-y-6">
-    {games.map((game) => {
-      const homeData = getBookSpreadData(game, game.home_team);
-      const awayData = getBookSpreadData(game, game.away_team);
-      const homeMarketAvg = getMarketAverageAdjustedSpread(game, game.home_team);
-      const awayMarketAvg = getMarketAverageAdjustedSpread(game, game.away_team);
-      
-      const homeValueDiff = homeData && homeMarketAvg !== null 
-        ? homeData.adjustedSpread - homeMarketAvg 
-        : null;
-      const awayValueDiff = awayData && awayMarketAvg !== null 
-        ? awayData.adjustedSpread - awayMarketAvg 
-        : null;
 
-      return (
-        <div key={game.id} className="border rounded-lg p-6 bg-white shadow">
-          <div className="mb-4">
-            <h2 className="text-2xl font-bold">
-              {game.away_team} @ {game.home_team}
-            </h2>
-            <p className="text-sm text-gray-500">
-              {new Date(game.commence_time).toLocaleString()}
-            </p>
-          </div>
+    {games
+      .filter(game => {
+        if (!searchTerm) return true;
+        const search = searchTerm.toLowerCase();
+        return (
+          game.home_team.toLowerCase().includes(search) ||
+          game.away_team.toLowerCase().includes(search)
+        );
+      })
+      .map((game) => {
+        const homeData = getBookSpreadData(game, game.home_team);
+        const awayData = getBookSpreadData(game, game.away_team);
+        const homeMarketAvg = getMarketAverageAdjustedSpread(game, game.home_team);
+        const awayMarketAvg = getMarketAverageAdjustedSpread(game, game.away_team);
+        
+        const homeValueDiff = homeData && homeMarketAvg !== null 
+          ? homeData.adjustedSpread - homeMarketAvg 
+          : null;
+        const awayValueDiff = awayData && awayMarketAvg !== null 
+          ? awayData.adjustedSpread - awayMarketAvg 
+          : null;
 
-          <div className="grid grid-cols-2 gap-4">
-            {/* Away Team */}
-            <div className="border rounded p-4">
-              <h3 className="font-semibold mb-3">{game.away_team}</h3>
-              {awayData ? (
-                <div className="space-y-2">
-                  <p className="text-sm">
-                    <span className="text-gray-600">Spread:</span>{' '}
-                    <span className="font-bold text-lg">
-                      {awayData.spread > 0 ? '+' : ''}{awayData.spread}
-                    </span>
-                    <span className="text-sm text-gray-500 ml-2">
-                      ({awayData.americanOdds > 0 ? '+' : ''}{awayData.americanOdds})
-                    </span>
-                  </p>
-                  <p className="text-sm">
-                    <span className="text-gray-600">Juice-Adjusted:</span>{' '}
-                    <span className="font-medium">
-                      {awayData.adjustedSpread > 0 ? '+' : ''}{awayData.adjustedSpread.toFixed(2)}
-                    </span>
-                  </p>
-                  <p className="text-sm">
-                    <span className="text-gray-600">Market Avg (adj):</span>{' '}
-                    <span>
-                      {awayMarketAvg !== null 
-                        ? (awayMarketAvg > 0 ? '+' : '') + awayMarketAvg.toFixed(2)
-                        : 'N/A'
-                      }
-                    </span>
-                  </p>
-                  {awayValueDiff !== null && (
-                    <div className={`text-sm font-bold p-2 rounded mt-2 ${
-                      awayValueDiff > 0.15 ? 'bg-green-100 text-green-700' : 
-                      awayValueDiff < -0.15 ? 'bg-red-100 text-red-700' : 
-                      'bg-gray-100 text-gray-700'
-                    }`}>
-                      Value: {awayValueDiff > 0 ? '+' : ''}{awayValueDiff.toFixed(2)} pts
-                      {awayValueDiff > 0.15 && ' ✓ GOOD VALUE'}
-                      {awayValueDiff < -0.15 && ' ✗ Poor value'}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <p className="text-sm text-gray-500">No data available</p>
-              )}
+        return (
+          <div key={game.id} className="border rounded-lg p-6 bg-white shadow">
+            <div className="mb-4">
+              <h2 className="text-2xl font-bold">
+                {game.away_team} @ {game.home_team}
+              </h2>
+              <p className="text-sm text-gray-500">
+                {new Date(game.commence_time).toLocaleString()}
+              </p>
             </div>
 
-            {/* Home Team */}
-            <div className="border rounded p-4">
-              <h3 className="font-semibold mb-3">{game.home_team}</h3>
-              {homeData ? (
-                <div className="space-y-2">
-                  <p className="text-sm">
-                    <span className="text-gray-600">Spread:</span>{' '}
-                    <span className="font-bold text-lg">
-                      {homeData.spread > 0 ? '+' : ''}{homeData.spread}
-                    </span>
-                    <span className="text-sm text-gray-500 ml-2">
-                      ({homeData.americanOdds > 0 ? '+' : ''}{homeData.americanOdds})
-                    </span>
-                  </p>
-                  <p className="text-sm">
-                    <span className="text-gray-600">Juice-Adjusted:</span>{' '}
-                    <span className="font-medium">
-                      {homeData.adjustedSpread > 0 ? '+' : ''}{homeData.adjustedSpread.toFixed(2)}
-                    </span>
-                  </p>
-                  <p className="text-sm">
-                    <span className="text-gray-600">Market Avg (adj):</span>{' '}
-                    <span>
-                      {homeMarketAvg !== null 
-                        ? (homeMarketAvg > 0 ? '+' : '') + homeMarketAvg.toFixed(2)
-                        : 'N/A'
-                      }
-                    </span>
-                  </p>
-                  {homeValueDiff !== null && (
-                    <div className={`text-sm font-bold p-2 rounded mt-2 ${
-                      homeValueDiff > 0.15 ? 'bg-green-100 text-green-700' : 
-                      homeValueDiff < -0.15 ? 'bg-red-100 text-red-700' : 
-                      'bg-gray-100 text-gray-700'
-                    }`}>
-                      Value: {homeValueDiff > 0 ? '+' : ''}{homeValueDiff.toFixed(2)} pts
-                      {homeValueDiff > 0.15 && ' ✓ GOOD VALUE'}
-                      {homeValueDiff < -0.15 && ' ✗ Poor value'}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <p className="text-sm text-gray-500">No data available</p>
-              )}
+            <div className="grid grid-cols-2 gap-4">
+              {/* Away Team */}
+              <div className="border rounded p-4">
+                <h3 className="font-semibold mb-3">{game.away_team}</h3>
+                {awayData ? (
+                  <div className="space-y-2">
+                    <p className="text-sm">
+                      <span className="text-gray-600">Spread:</span>{' '}
+                      <span className="font-bold text-lg">
+                        {awayData.spread > 0 ? '+' : ''}{awayData.spread}
+                      </span>
+                      <span className="text-sm text-gray-500 ml-2">
+                        ({awayData.americanOdds > 0 ? '+' : ''}{awayData.americanOdds})
+                      </span>
+                    </p>
+                    <p className="text-sm">
+                      <span className="text-gray-600">Juice-Adjusted:</span>{' '}
+                      <span className="font-medium">
+                        {awayData.adjustedSpread > 0 ? '+' : ''}{awayData.adjustedSpread.toFixed(2)}
+                      </span>
+                    </p>
+                    <p className="text-sm">
+                      <span className="text-gray-600">Market Avg (adj):</span>{' '}
+                      <span>
+                        {awayMarketAvg !== null 
+                          ? (awayMarketAvg > 0 ? '+' : '') + awayMarketAvg.toFixed(2)
+                          : 'N/A'
+                        }
+                      </span>
+                    </p>
+                    {awayValueDiff !== null && (
+                      <div className={`text-sm font-bold p-2 rounded mt-2 ${
+                        awayValueDiff > 0.15 ? 'bg-green-100 text-green-700' : 
+                        awayValueDiff < -0.15 ? 'bg-red-100 text-red-700' : 
+                        'bg-gray-100 text-gray-700'
+                      }`}>
+                        Value: {awayValueDiff > 0 ? '+' : ''}{awayValueDiff.toFixed(2)} pts
+                        {awayValueDiff > 0.15 && ' ✓ GOOD VALUE'}
+                        {awayValueDiff < -0.15 && ' ✗ Poor value'}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500">No data available</p>
+                )}
+              </div>
+
+              {/* Home Team */}
+              <div className="border rounded p-4">
+                <h3 className="font-semibold mb-3">{game.home_team}</h3>
+                {homeData ? (
+                  <div className="space-y-2">
+                    <p className="text-sm">
+                      <span className="text-gray-600">Spread:</span>{' '}
+                      <span className="font-bold text-lg">
+                        {homeData.spread > 0 ? '+' : ''}{homeData.spread}
+                      </span>
+                      <span className="text-sm text-gray-500 ml-2">
+                        ({homeData.americanOdds > 0 ? '+' : ''}{homeData.americanOdds})
+                      </span>
+                    </p>
+                    <p className="text-sm">
+                      <span className="text-gray-600">Juice-Adjusted:</span>{' '}
+                      <span className="font-medium">
+                        {homeData.adjustedSpread > 0 ? '+' : ''}{homeData.adjustedSpread.toFixed(2)}
+                      </span>
+                    </p>
+                    <p className="text-sm">
+                      <span className="text-gray-600">Market Avg (adj):</span>{' '}
+                      <span>
+                        {homeMarketAvg !== null 
+                          ? (homeMarketAvg > 0 ? '+' : '') + homeMarketAvg.toFixed(2)
+                          : 'N/A'
+                        }
+                      </span>
+                    </p>
+                    {homeValueDiff !== null && (
+                      <div className={`text-sm font-bold p-2 rounded mt-2 ${
+                        homeValueDiff > 0.15 ? 'bg-green-100 text-green-700' : 
+                        homeValueDiff < -0.15 ? 'bg-red-100 text-red-700' : 
+                        'bg-gray-100 text-gray-700'
+                      }`}>
+                        Value: {homeValueDiff > 0 ? '+' : ''}{homeValueDiff.toFixed(2)} pts
+                        {homeValueDiff > 0.15 && ' ✓ GOOD VALUE'}
+                        {homeValueDiff < -0.15 && ' ✗ Poor value'}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500">No data available</p>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      );
-    })}
-      </div>
-    )}
-    </div>
+        );
+      })}
+  </div>
+)}
+</div>
   );
 }
