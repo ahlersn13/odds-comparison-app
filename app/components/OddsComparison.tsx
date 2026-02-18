@@ -327,6 +327,9 @@ export default function OddsComparison({ sport, sportTitle }: OddsComparisonProp
           game.away_team.toLowerCase().includes(search)
         );
       })
+
+      .sort((a, b) => new Date(a.commence_time).getTime() - new Date(b.commence_time).getTime())
+      
       .map((game) => {
         const homeData = getBookSpreadData(game, game.home_team);
         const awayData = getBookSpreadData(game, game.away_team);
