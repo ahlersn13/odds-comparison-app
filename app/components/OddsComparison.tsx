@@ -37,6 +37,7 @@ export default function OddsComparison({ sport, sportTitle }: OddsComparisonProp
   const [loading, setLoading] = useState(true);
   const [selectedBook, setSelectedBook] = useState('fanduel');
   const [searchTerm, setSearchTerm] = useState('');
+  const [showTodayOnly, setShowTodayOnly] = useState(true);
 
   const sportsbooks = [
     { key: 'fanduel', title: 'FanDuel' },
@@ -129,51 +130,74 @@ export default function OddsComparison({ sport, sportTitle }: OddsComparisonProp
     return adjustedSpreads.reduce((a, b) => a + b, 0) / adjustedSpreads.length;
   };
 
-  // Calculate all value opportunities
-  const getTopValuePlays = () => {
-    const valuePlays: Array<{
-      game: Game;
-      team: string;
-      spread: number;
-      price: number;
-      marketAvg: number;
-      valueDiff: number;
-    }> = [];
+ // Calculate all value opportunities
+const getTopValuePlays = (): Array<{
+  game: Game;
+  team: string;
+  spread: number;
+  price: number;
+  adjustedSpread: number;
+  marketAvg: number;
+  valueDiff: number;
+}> => {
+  const plays: Array<{
+    game: Game;
+    team: string;
+    spread: number;
+    price: number;
+    adjustedSpread: number;
+    marketAvg: number;
+    valueDiff: number;
+  }> = [];
 
-    games.forEach(game => {
-      // Check home team
-      const homeData = getBookSpreadData(game, game.home_team);
-      const homeMarketAvg = getMarketAverageAdjustedSpread(game, game.home_team);
-      if (homeData && homeMarketAvg !== null) {
-        const homeValueDiff = homeData.adjustedSpread - homeMarketAvg;
-        valuePlays.push({
-          game,
-          team: game.home_team,
-          spread: homeData.spread,
-          price: homeData.price,
-          marketAvg: homeMarketAvg,
-          valueDiff: homeValueDiff
-        });
-      }
+  // Filter to only today's games
+  const today = new Date();
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const todayEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
 
-      // Check away team
-      const awayData = getBookSpreadData(game, game.away_team);
-      const awayMarketAvg = getMarketAverageAdjustedSpread(game, game.away_team);
-      if (awayData && awayMarketAvg !== null) {
-        const awayValueDiff = awayData.adjustedSpread - awayMarketAvg;
-        valuePlays.push({
-          game,
-          team: game.away_team,
-          spread: awayData.spread,
-          price: awayData.price,
-          marketAvg: awayMarketAvg,
-          valueDiff: awayValueDiff
-        });
-      }
-    });
+  const todaysGames = showTodayOnly 
+  ? games.filter(game => {
+      const gameTime = new Date(game.commence_time);
+      return gameTime >= todayStart && gameTime < todayEnd;
+    })
+  : games; // If showTodayOnly is false, use all games
 
-    return valuePlays.sort((a, b) => b.valueDiff - a.valueDiff).slice(0, 10);
-  };
+  todaysGames.forEach(game => {
+    // Check home team
+    const homeData = getBookSpreadData(game, game.home_team);
+    const homeMarketAvg = getMarketAverageAdjustedSpread(game, game.home_team);
+    if (homeData && homeMarketAvg !== null) {
+      const homeValueDiff = homeData.adjustedSpread - homeMarketAvg;
+      plays.push({
+        game,
+        team: game.home_team,
+        spread: homeData.spread,
+        price: homeData.price,
+        adjustedSpread: homeData.adjustedSpread,
+        marketAvg: homeMarketAvg,
+        valueDiff: homeValueDiff
+      });
+    }
+
+    // Check away team
+    const awayData = getBookSpreadData(game, game.away_team);
+    const awayMarketAvg = getMarketAverageAdjustedSpread(game, game.away_team);
+    if (awayData && awayMarketAvg !== null) {
+      const awayValueDiff = awayData.adjustedSpread - awayMarketAvg;
+      plays.push({
+        game,
+        team: game.away_team,
+        spread: awayData.spread,
+        price: awayData.price,
+        adjustedSpread: awayData.adjustedSpread,
+        marketAvg: awayMarketAvg,
+        valueDiff: awayValueDiff
+      });
+    }
+  });
+
+  return plays.sort((a, b) => b.valueDiff - a.valueDiff).slice(0, 10);
+};
 
   const topValuePlays = getTopValuePlays();
 
@@ -198,24 +222,52 @@ export default function OddsComparison({ sport, sportTitle }: OddsComparisonProp
         </select>
       </div>
 
-      <div className="mb-6">
-        <label className="block text-sm font-medium mb-2">Search Teams:</label>
-        <input
-          type="text"
-          placeholder="Search by team name..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="border rounded px-4 py-2 w-64"
-        />
-        {searchTerm && (
-          <button
-            onClick={() => setSearchTerm('')}
-            className="ml-2 text-sm text-blue-600 hover:text-blue-800"
-          >
-            Clear
-          </button>
-        )}
+    {/* Search Bar */}
+    <div className="mb-6">
+      <label className="block text-sm font-medium mb-2">Search Teams:</label>
+      <input
+        type="text"
+        placeholder="Search by team name..."
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+        className="border rounded px-4 py-2 w-64"
+      />
+      {searchTerm && (
+        <button
+          onClick={() => setSearchTerm('')}
+          className="ml-2 text-sm text-blue-600 hover:text-blue-800"
+        >
+          Clear
+        </button>
+      )}
+    </div>
+
+    {/* ADD THIS TOGGLE */}
+    <div className="mb-6">
+      <label className="block text-sm font-medium mb-2">Top 10 Filter:</label>
+      <div className="flex gap-2">
+        <button
+          onClick={() => setShowTodayOnly(true)}
+          className={`px-4 py-2 rounded ${
+            showTodayOnly 
+              ? 'bg-blue-600 text-white' 
+              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+          }`}
+        >
+          Today's Games
+        </button>
+        <button
+          onClick={() => setShowTodayOnly(false)}
+          className={`px-4 py-2 rounded ${
+            !showTodayOnly 
+              ? 'bg-blue-600 text-white' 
+              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+          }`}
+        >
+          All Games
+        </button>
       </div>
+    </div>
 
       {/* TOP 10 VALUE PLAYS */}
       {topValuePlays.length > 0 && (
