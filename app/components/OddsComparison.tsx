@@ -150,7 +150,7 @@ const getBookTotalsData = (game: Game, teamType: 'home' | 'away'): {
   const overOutcome = totalsMarket.outcomes.find(o => o.name === 'Over');
   const underOutcome = totalsMarket.outcomes.find(o => o.name === 'Under');
   
-  if (!overOutcome || !underOutcome) return null;
+  if (!overOutcome || !underOutcome || overOutcome.point === undefined || underOutcome.point === undefined) return null;
 
   const overAmericanOdds = decimalToAmerican(overOutcome.price);
   const underAmericanOdds = decimalToAmerican(underOutcome.price);
@@ -181,7 +181,7 @@ const getMarketAverageTotals = (game: Game) => {
     const totalsMarket = bookmaker.markets.find(m => m.key === 'totals');
     if (totalsMarket) {
       const overOutcome = totalsMarket.outcomes.find(o => o.name === 'Over');
-      if (overOutcome) {
+      if (overOutcome && overOutcome.point !== undefined) {
         const adjusted = calculateJuiceAdjustedValue(overOutcome.point, overOutcome.price);
         totalSum += adjusted;
         count++;
