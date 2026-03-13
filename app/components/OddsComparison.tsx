@@ -263,7 +263,7 @@ const getTopValuePlays = (): Array<{
     
     if (totalsData && totalsMarketAvg !== null) {
       // Over value
-      const overValueDiff = totalsData.overAdjusted - totalsMarketAvg;
+      const overValueDiff = totalsMarketAvg - totalsData.overAdjusted;
       plays.push({
         game,
         team: `Over ${totalsData.total}`,
@@ -600,7 +600,7 @@ const getTopValuePlays = (): Array<{
           const totalsData = getBookTotalsData(game, 'home');
           const totalsMarketAvg = getMarketAverageTotals(game);
           const overValueDiff = totalsData && totalsMarketAvg !== null 
-            ? totalsData.overAdjusted - totalsMarketAvg 
+            ? totalsMarketAvg - totalsData.overAdjusted
             : null;
           const underValueDiff = totalsData && totalsMarketAvg !== null 
             ? totalsData.underAdjusted - totalsMarketAvg 
