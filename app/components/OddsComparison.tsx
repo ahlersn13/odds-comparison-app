@@ -130,6 +130,68 @@ export default function OddsComparison({ sport, sportTitle }: OddsComparisonProp
     return adjustedSpreads.reduce((a, b) => a + b, 0) / adjustedSpreads.length;
   };
 
+// Get totals data for a team from selected sportsbook
+// Get totals data for a team from selected sportsbook
+const getBookTotalsData = (game: Game, teamType: 'home' | 'away'): {
+  total: number;
+  overPrice: number;
+  underPrice: number;
+  overAmericanOdds: number;
+  underAmericanOdds: number;
+  overAdjusted: number;
+  underAdjusted: number;
+} | null => {
+  const bookmaker = game.bookmakers.find(b => b.key === selectedBook);
+  if (!bookmaker) return null;
+
+  const totalsMarket = bookmaker.markets.find(m => m.key === 'totals');
+  if (!totalsMarket) return null;
+
+  const overOutcome = totalsMarket.outcomes.find(o => o.name === 'Over');
+  const underOutcome = totalsMarket.outcomes.find(o => o.name === 'Under');
+  
+  if (!overOutcome || !underOutcome) return null;
+
+  const overAmericanOdds = decimalToAmerican(overOutcome.price);
+  const underAmericanOdds = decimalToAmerican(underOutcome.price);
+  
+  const overAdjusted = calculateJuiceAdjustedValue(overOutcome.point, overOutcome.price);
+  const underAdjusted = calculateJuiceAdjustedValue(underOutcome.point, underOutcome.price);
+
+  return {
+    total: overOutcome.point,
+    overPrice: overOutcome.price,
+    underPrice: underOutcome.price,
+    overAmericanOdds,
+    underAmericanOdds,
+    overAdjusted,
+    underAdjusted
+  };
+};
+
+// Get market average for totals
+const getMarketAverageTotals = (game: Game) => {
+  const otherBooks = game.bookmakers.filter(b => b.key !== selectedBook);
+  if (otherBooks.length === 0) return null;
+
+  let totalSum = 0;
+  let count = 0;
+
+  otherBooks.forEach(bookmaker => {
+    const totalsMarket = bookmaker.markets.find(m => m.key === 'totals');
+    if (totalsMarket) {
+      const overOutcome = totalsMarket.outcomes.find(o => o.name === 'Over');
+      if (overOutcome) {
+        const adjusted = calculateJuiceAdjustedValue(overOutcome.point, overOutcome.price);
+        totalSum += adjusted;
+        count++;
+      }
+    }
+  });
+
+  return count > 0 ? totalSum / count : null;
+};
+
  // Calculate all value opportunities
 const getTopValuePlays = (): Array<{
   game: Game;
@@ -179,7 +241,7 @@ const getTopValuePlays = (): Array<{
       });
     }
 
-    // Check away team
+// Check away team
     const awayData = getBookSpreadData(game, game.away_team);
     const awayMarketAvg = getMarketAverageAdjustedSpread(game, game.away_team);
     if (awayData && awayMarketAvg !== null) {
@@ -192,6 +254,36 @@ const getTopValuePlays = (): Array<{
         adjustedSpread: awayData.adjustedSpread,
         marketAvg: awayMarketAvg,
         valueDiff: awayValueDiff
+      });
+    }
+
+    // ADD TOTALS HERE:
+    const totalsData = getBookTotalsData(game, 'home');
+    const totalsMarketAvg = getMarketAverageTotals(game);
+    
+    if (totalsData && totalsMarketAvg !== null) {
+      // Over value
+      const overValueDiff = totalsData.overAdjusted - totalsMarketAvg;
+      plays.push({
+        game,
+        team: `Over ${totalsData.total}`,
+        spread: totalsData.total,
+        price: totalsData.overPrice,
+        adjustedSpread: totalsData.overAdjusted,
+        marketAvg: totalsMarketAvg,
+        valueDiff: overValueDiff
+      });
+
+      // Under value
+      const underValueDiff = totalsData.underAdjusted - totalsMarketAvg;
+      plays.push({
+        game,
+        team: `Under ${totalsData.total}`,
+        spread: -totalsData.total,
+        price: totalsData.underPrice,
+        adjustedSpread: totalsData.underAdjusted,
+        marketAvg: totalsMarketAvg,
+        valueDiff: underValueDiff
       });
     }
   });
@@ -382,128 +474,211 @@ const getTopValuePlays = (): Array<{
 
       .sort((a, b) => new Date(a.commence_time).getTime() - new Date(b.commence_time).getTime())
       
-      .map((game) => {
-        const homeData = getBookSpreadData(game, game.home_team);
-        const awayData = getBookSpreadData(game, game.away_team);
-        const homeMarketAvg = getMarketAverageAdjustedSpread(game, game.home_team);
-        const awayMarketAvg = getMarketAverageAdjustedSpread(game, game.away_team);
-        
-        const homeValueDiff = homeData && homeMarketAvg !== null 
-          ? homeData.adjustedSpread - homeMarketAvg 
-          : null;
-        const awayValueDiff = awayData && awayMarketAvg !== null 
-          ? awayData.adjustedSpread - awayMarketAvg 
-          : null;
 
-        return (
-          <div key={game.id} className="border rounded-lg p-6 bg-white shadow">
-            <div className="mb-4">
-              <h2 className="text-2xl font-bold">
-                {game.away_team} @ {game.home_team}
-              </h2>
-              <p className="text-sm text-gray-500">
-                {new Date(game.commence_time).toLocaleString()}
+.map((game) => {
+  const homeData = getBookSpreadData(game, game.home_team);
+  const awayData = getBookSpreadData(game, game.away_team);
+  const homeMarketAvg = getMarketAverageAdjustedSpread(game, game.home_team);
+  const awayMarketAvg = getMarketAverageAdjustedSpread(game, game.away_team);
+  
+  const homeValueDiff = homeData && homeMarketAvg !== null 
+    ? homeData.adjustedSpread - homeMarketAvg 
+    : null;
+  const awayValueDiff = awayData && awayMarketAvg !== null 
+    ? awayData.adjustedSpread - awayMarketAvg 
+    : null;
+
+  return (
+    <div key={game.id} className="border rounded-lg p-6 bg-white shadow">
+      <div className="mb-4">
+        <h2 className="text-2xl font-bold">
+          {game.away_team} @ {game.home_team}
+        </h2>
+        <p className="text-sm text-gray-500">
+          {new Date(game.commence_time).toLocaleString()}
+        </p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        {/* Away Team */}
+        <div className="border rounded p-4">
+          <h3 className="font-semibold mb-3">{game.away_team}</h3>
+          {awayData ? (
+            <div className="space-y-2">
+              <p className="text-sm">
+                <span className="text-gray-600">Spread:</span>{' '}
+                <span className="font-bold text-lg">
+                  {awayData.spread > 0 ? '+' : ''}{awayData.spread}
+                </span>
+                <span className="text-sm text-gray-500 ml-2">
+                  ({awayData.americanOdds > 0 ? '+' : ''}{awayData.americanOdds})
+                </span>
               </p>
+              <p className="text-sm">
+                <span className="text-gray-600">Juice-Adjusted:</span>{' '}
+                <span className="font-medium">
+                  {awayData.adjustedSpread > 0 ? '+' : ''}{awayData.adjustedSpread.toFixed(2)}
+                </span>
+              </p>
+              <p className="text-sm">
+                <span className="text-gray-600">Market Avg (adj):</span>{' '}
+                <span>
+                  {awayMarketAvg !== null 
+                    ? (awayMarketAvg > 0 ? '+' : '') + awayMarketAvg.toFixed(2)
+                    : 'N/A'
+                  }
+                </span>
+              </p>
+              {awayValueDiff !== null && (
+                <div className={`text-sm font-bold p-2 rounded mt-2 ${
+                  awayValueDiff > 0.15 ? 'bg-green-100 text-green-700' : 
+                  awayValueDiff < -0.15 ? 'bg-red-100 text-red-700' : 
+                  'bg-gray-100 text-gray-700'
+                }`}>
+                  Value: {awayValueDiff > 0 ? '+' : ''}{awayValueDiff.toFixed(2)} pts
+                  {awayValueDiff > 0.15 && ' ✓ GOOD VALUE'}
+                  {awayValueDiff < -0.15 && ' ✗ Poor value'}
+                </div>
+              )}
             </div>
+          ) : (
+            <p className="text-sm text-gray-500">No data available</p>
+          )}
+        </div>
 
+        {/* Home Team */}
+        <div className="border rounded p-4">
+          <h3 className="font-semibold mb-3">{game.home_team}</h3>
+          {homeData ? (
+            <div className="space-y-2">
+              <p className="text-sm">
+                <span className="text-gray-600">Spread:</span>{' '}
+                <span className="font-bold text-lg">
+                  {homeData.spread > 0 ? '+' : ''}{homeData.spread}
+                </span>
+                <span className="text-sm text-gray-500 ml-2">
+                  ({homeData.americanOdds > 0 ? '+' : ''}{homeData.americanOdds})
+                </span>
+              </p>
+              <p className="text-sm">
+                <span className="text-gray-600">Juice-Adjusted:</span>{' '}
+                <span className="font-medium">
+                  {homeData.adjustedSpread > 0 ? '+' : ''}{homeData.adjustedSpread.toFixed(2)}
+                </span>
+              </p>
+              <p className="text-sm">
+                <span className="text-gray-600">Market Avg (adj):</span>{' '}
+                <span>
+                  {homeMarketAvg !== null 
+                    ? (homeMarketAvg > 0 ? '+' : '') + homeMarketAvg.toFixed(2)
+                    : 'N/A'
+                  }
+                </span>
+              </p>
+              {homeValueDiff !== null && (
+                <div className={`text-sm font-bold p-2 rounded mt-2 ${
+                  homeValueDiff > 0.15 ? 'bg-green-100 text-green-700' : 
+                  homeValueDiff < -0.15 ? 'bg-red-100 text-red-700' : 
+                  'bg-gray-100 text-gray-700'
+                }`}>
+                  Value: {homeValueDiff > 0 ? '+' : ''}{homeValueDiff.toFixed(2)} pts
+                  {homeValueDiff > 0.15 && ' ✓ GOOD VALUE'}
+                  {homeValueDiff < -0.15 && ' ✗ Poor value'}
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500">No data available</p>
+          )}
+        </div>
+      </div>
+
+      {/* TOTALS SECTION */}
+      <div className="mt-4 border-t pt-4">
+        <h3 className="font-semibold mb-3">Game Total</h3>
+        {(() => {
+          const totalsData = getBookTotalsData(game, 'home');
+          const totalsMarketAvg = getMarketAverageTotals(game);
+          const overValueDiff = totalsData && totalsMarketAvg !== null 
+            ? totalsData.overAdjusted - totalsMarketAvg 
+            : null;
+          const underValueDiff = totalsData && totalsMarketAvg !== null 
+            ? totalsData.underAdjusted - totalsMarketAvg 
+            : null;
+
+          return totalsData ? (
             <div className="grid grid-cols-2 gap-4">
-              {/* Away Team */}
+              {/* Over */}
               <div className="border rounded p-4">
-                <h3 className="font-semibold mb-3">{game.away_team}</h3>
-                {awayData ? (
-                  <div className="space-y-2">
-                    <p className="text-sm">
-                      <span className="text-gray-600">Spread:</span>{' '}
-                      <span className="font-bold text-lg">
-                        {awayData.spread > 0 ? '+' : ''}{awayData.spread}
-                      </span>
-                      <span className="text-sm text-gray-500 ml-2">
-                        ({awayData.americanOdds > 0 ? '+' : ''}{awayData.americanOdds})
-                      </span>
-                    </p>
-                    <p className="text-sm">
-                      <span className="text-gray-600">Juice-Adjusted:</span>{' '}
-                      <span className="font-medium">
-                        {awayData.adjustedSpread > 0 ? '+' : ''}{awayData.adjustedSpread.toFixed(2)}
-                      </span>
-                    </p>
-                    <p className="text-sm">
-                      <span className="text-gray-600">Market Avg (adj):</span>{' '}
-                      <span>
-                        {awayMarketAvg !== null 
-                          ? (awayMarketAvg > 0 ? '+' : '') + awayMarketAvg.toFixed(2)
-                          : 'N/A'
-                        }
-                      </span>
-                    </p>
-                    {awayValueDiff !== null && (
-                      <div className={`text-sm font-bold p-2 rounded mt-2 ${
-                        awayValueDiff > 0.15 ? 'bg-green-100 text-green-700' : 
-                        awayValueDiff < -0.15 ? 'bg-red-100 text-red-700' : 
-                        'bg-gray-100 text-gray-700'
-                      }`}>
-                        Value: {awayValueDiff > 0 ? '+' : ''}{awayValueDiff.toFixed(2)} pts
-                        {awayValueDiff > 0.15 && ' ✓ GOOD VALUE'}
-                        {awayValueDiff < -0.15 && ' ✗ Poor value'}
-                      </div>
-                    )}
+                <h4 className="font-semibold mb-2">Over {totalsData.total}</h4>
+                <p className="text-sm">
+                  <span className="text-gray-600">Odds:</span>{' '}
+                  <span className="font-medium">
+                    {totalsData.overAmericanOdds > 0 ? '+' : ''}{totalsData.overAmericanOdds}
+                  </span>
+                </p>
+                <p className="text-sm">
+                  <span className="text-gray-600">Juice-Adjusted:</span>{' '}
+                  <span className="font-medium">{totalsData.overAdjusted.toFixed(2)}</span>
+                </p>
+                <p className="text-sm">
+                  <span className="text-gray-600">Market Avg:</span>{' '}
+                  <span>{totalsMarketAvg !== null ? totalsMarketAvg.toFixed(2) : 'N/A'}</span>
+                </p>
+                {overValueDiff !== null && (
+                  <div className={`text-sm font-bold p-2 rounded mt-2 ${
+                    overValueDiff > 0.15 ? 'bg-green-100 text-green-700' : 
+                    overValueDiff < -0.15 ? 'bg-red-100 text-red-700' : 
+                    'bg-gray-100 text-gray-700'
+                  }`}>
+                    Value: {overValueDiff > 0 ? '+' : ''}{overValueDiff.toFixed(2)} pts
+                    {overValueDiff > 0.15 && ' ✓ GOOD VALUE'}
+                    {overValueDiff < -0.15 && ' ✗ Poor value'}
                   </div>
-                ) : (
-                  <p className="text-sm text-gray-500">No data available</p>
                 )}
               </div>
 
-              {/* Home Team */}
+              {/* Under */}
               <div className="border rounded p-4">
-                <h3 className="font-semibold mb-3">{game.home_team}</h3>
-                {homeData ? (
-                  <div className="space-y-2">
-                    <p className="text-sm">
-                      <span className="text-gray-600">Spread:</span>{' '}
-                      <span className="font-bold text-lg">
-                        {homeData.spread > 0 ? '+' : ''}{homeData.spread}
-                      </span>
-                      <span className="text-sm text-gray-500 ml-2">
-                        ({homeData.americanOdds > 0 ? '+' : ''}{homeData.americanOdds})
-                      </span>
-                    </p>
-                    <p className="text-sm">
-                      <span className="text-gray-600">Juice-Adjusted:</span>{' '}
-                      <span className="font-medium">
-                        {homeData.adjustedSpread > 0 ? '+' : ''}{homeData.adjustedSpread.toFixed(2)}
-                      </span>
-                    </p>
-                    <p className="text-sm">
-                      <span className="text-gray-600">Market Avg (adj):</span>{' '}
-                      <span>
-                        {homeMarketAvg !== null 
-                          ? (homeMarketAvg > 0 ? '+' : '') + homeMarketAvg.toFixed(2)
-                          : 'N/A'
-                        }
-                      </span>
-                    </p>
-                    {homeValueDiff !== null && (
-                      <div className={`text-sm font-bold p-2 rounded mt-2 ${
-                        homeValueDiff > 0.15 ? 'bg-green-100 text-green-700' : 
-                        homeValueDiff < -0.15 ? 'bg-red-100 text-red-700' : 
-                        'bg-gray-100 text-gray-700'
-                      }`}>
-                        Value: {homeValueDiff > 0 ? '+' : ''}{homeValueDiff.toFixed(2)} pts
-                        {homeValueDiff > 0.15 && ' ✓ GOOD VALUE'}
-                        {homeValueDiff < -0.15 && ' ✗ Poor value'}
-                      </div>
-                    )}
+                <h4 className="font-semibold mb-2">Under {totalsData.total}</h4>
+                <p className="text-sm">
+                  <span className="text-gray-600">Odds:</span>{' '}
+                  <span className="font-medium">
+                    {totalsData.underAmericanOdds > 0 ? '+' : ''}{totalsData.underAmericanOdds}
+                  </span>
+                </p>
+                <p className="text-sm">
+                  <span className="text-gray-600">Juice-Adjusted:</span>{' '}
+                  <span className="font-medium">{totalsData.underAdjusted.toFixed(2)}</span>
+                </p>
+                <p className="text-sm">
+                  <span className="text-gray-600">Market Avg:</span>{' '}
+                  <span>{totalsMarketAvg !== null ? totalsMarketAvg.toFixed(2) : 'N/A'}</span>
+                </p>
+                {underValueDiff !== null && (
+                  <div className={`text-sm font-bold p-2 rounded mt-2 ${
+                    underValueDiff > 0.15 ? 'bg-green-100 text-green-700' : 
+                    underValueDiff < -0.15 ? 'bg-red-100 text-red-700' : 
+                    'bg-gray-100 text-gray-700'
+                  }`}>
+                    Value: {underValueDiff > 0 ? '+' : ''}{underValueDiff.toFixed(2)} pts
+                    {underValueDiff > 0.15 && ' ✓ GOOD VALUE'}
+                    {underValueDiff < -0.15 && ' ✗ Poor value'}
                   </div>
-                ) : (
-                  <p className="text-sm text-gray-500">No data available</p>
                 )}
               </div>
             </div>
-          </div>
-        );
-      })}
-  </div>
-)}
-</div>
+          ) : (
+            <p className="text-sm text-gray-500">No totals data available</p>
+          );
+        })()}
+      </div>
+
+    </div>
+  );
+})}
+      </div>
+    )}
+    </div>
   );
 }
