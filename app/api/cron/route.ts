@@ -1,25 +1,24 @@
 import { NextResponse } from 'next/server';
 import { query } from '../../lib/db';
 
+
+
 // All sports with their active status
 const SPORTS_CONFIG = {
   high_priority: [
-    'basketball_nba',
     'basketball_ncaab',
-    'basketball_wncaab',
-    'icehockey_nhl',
+    'americanfootball_nfl',
+    'americanfootball_ncaaf',
   ],
   medium_priority: [
-    'basketball_nba',
     'basketball_ncaab',
-    'basketball_wncaab',
-    'icehockey_nhl',
+    'americanfootball_nfl',
+    'americanfootball_ncaaf',
   ],
   low_priority: [
-    'basketball_nba',
     'basketball_ncaab',
-    'basketball_wncaab',
-    'icehockey_nhl',
+    'americanfootball_nfl',
+    'americanfootball_ncaaf',
   ],
 };
 
